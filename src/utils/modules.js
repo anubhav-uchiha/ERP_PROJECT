@@ -1,0 +1,15 @@
+module.exports = [
+  "USER",
+  "ROLE",
+  "COMPANY",
+  "INVENTORY",
+  "PRODUCT",
+  "BILL",
+  "REPORT",
+  "SUPPLIER",
+  "CUSTOMER",
+  "ORDER",
+  "PAYROLL",
+  "EXPENSE",
+  "ATTENDANCE",
+];

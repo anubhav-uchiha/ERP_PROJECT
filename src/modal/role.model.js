@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 // Import predefined permissions list from utils file
 const PERMISSIONS = require("../utils/permissions.js");
+const MODULES = require("../utils/modules.js");
 // Create a schema for Role collection
 const roleSchema = mongoose.Schema(
   {
@@ -10,7 +11,6 @@ const roleSchema = mongoose.Schema(
       required: true,
       uppercase: true,
       trim: true,
-      unique: true,
     },
     // Description of the role
     description: {
@@ -18,6 +18,13 @@ const roleSchema = mongoose.Schema(
       required: false,
       trim: true,
       default: "",
+    },
+
+    companyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      required: true,
+      index: true,
     },
     // Description of the role
     permissions: {
@@ -29,6 +36,7 @@ const roleSchema = mongoose.Schema(
             required: true,
             trim: true,
             uppercase: true, // Convert module name to uppercase
+            enum: MODULES,
           },
           // Action allowed on that module (Example: CREATE, READ, UPDATE, DELETE)
           action: {
@@ -56,11 +64,17 @@ const roleSchema = mongoose.Schema(
         },
       ],
     },
-
+    isSystemRole: {
+      type: Boolean,
+      default: false,
+    },
     isActive: {
       type: Boolean,
       default: true,
-      required: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
 
     // permissions_2: {
@@ -74,7 +88,13 @@ const roleSchema = mongoose.Schema(
     //   ],
     // },
   },
+
   { timestamps: true },
+);
+
+roleSchema.index(
+  { name: 1, companyId: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } },
 );
 
 // roleSchema.pre("validate", function (next) {
@@ -119,7 +139,7 @@ roleSchema.pre("validate", function (next) {
 roleSchema.index({ name: 1, isActive: 1 });
 
 roleSchema.query.active = function () {
-  return this.where({ isActive: true });
+  return this.where({ isActive: true, isDeleted: false });
 };
 
 // Create a Mongoose model named "Role" using the roleSchema.
