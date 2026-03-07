@@ -44,7 +44,10 @@ const registerUser = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email: emailNormalize });
+    const user = await User.findOne({
+      email: emailNormalize,
+      isDeleted: false,
+    });
 
     if (user) {
       return res

@@ -116,7 +116,7 @@ const companySchema = mongoose.Schema(
       trim: true,
       required: false,
       lowercase: true,
-      unique: true,
+      index: true,
     },
     // Determines whether the company is active in the system
     isActive: {
