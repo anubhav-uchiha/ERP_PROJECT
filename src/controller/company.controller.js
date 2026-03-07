@@ -1,7 +1,9 @@
 // Import the Company mongoose model
 const Company = require("../modal/company.model.js");
+const Role = require("../modal/role.model.js");
 // Import validator library for validating email and other fields
 const validator = require("validator");
+const generatePermissions = require("../utils/generatePermissions");
 
 // Controller function to create a new company
 const createCompany = async (req, res) => {
@@ -90,9 +92,9 @@ const createCompany = async (req, res) => {
 
     // Remove extra spaces from all the address field
     company_address.address_line_1 = address_line_1.trim();
-    company_address.address_line_2 = address_line_2.trim();
-    company_address.address_line_3 = address_line_3.trim();
-    company_address.address_line_4 = address_line_4.trim();
+    company_address.address_line_2 = address_line_2?.trim() || "";
+    company_address.address_line_3 = address_line_3?.trim() || "";
+    company_address.address_line_4 = address_line_4?.trim() || "";
     company_address.city = city.trim();
     company_address.state = state.trim();
     company_address.country = country.trim();
@@ -126,7 +128,15 @@ const createCompany = async (req, res) => {
     // Save the company document to MongoDB
     const savedCompany = await newCompany.save();
 
+    const ownerRole = await Role.create({
+      name: "OWNER",
+      companyId: savedCompany._id,
+      permissions: generatePermissions(),
+      isSystemRole: true,
+    });
+
     req.user.companyId = savedCompany._id;
+    req.user.roleId = ownerRole._id;
     await req.user.save();
 
     // Send success response with the created company data
