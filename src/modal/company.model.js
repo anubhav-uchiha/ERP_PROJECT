@@ -116,6 +116,7 @@ const companySchema = mongoose.Schema(
       trim: true,
       required: false,
       lowercase: true,
+      unique: true,
       index: true,
     },
     // Determines whether the company is active in the system
@@ -145,7 +146,8 @@ companySchema.query.active = function () {
 // Middleware that runs before saving a document to the database
 companySchema.pre("save", function (next) {
   // Check if the company_name field was modified and it has a value
-  if (this.isModified("company_name") && this.company_name) {
+  // if (this.isModified("company_name") && this.company_name) {
+  if (!this.isNew && this.company_name) {
     // Generate a URL-friendly slug from the company name
     this.slug = this.company_name
       .toLowerCase()
