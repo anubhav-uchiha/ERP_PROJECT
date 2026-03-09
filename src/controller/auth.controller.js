@@ -1,6 +1,7 @@
 const User = require("../modal/user.modal.js");
-const hashPassword = require("../utils/password.utils.js");
+const { hashPassword, comparePassword } = require("../utils/password.utils.js");
 const validator = require("validator");
+const generateToken = require("../utils/token.utils.js");
 
 const registerUser = async (req, res) => {
   try {
@@ -17,10 +18,10 @@ const registerUser = async (req, res) => {
         .json({ success: false, message: "All Field Are Required" });
     }
 
-    const firstName = first_name.trim();
-    const lastName = last_name.trim();
-    const emailNormalize = email.trim().toLowerCase();
-    const passwordTrim = password.trim();
+    const firstName = first_name?.trim();
+    const lastName = last_name?.trim();
+    const emailNormalize = email?.trim().toLowerCase();
+    const passwordTrim = password?.trim();
 
     if (!validator.isEmail(emailNormalize)) {
       return res
@@ -89,6 +90,73 @@ const registerUser = async (req, res) => {
   }
 };
 
+const loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email?.trim() || !password?.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and Password are required" });
+    }
+    const emailNormalize = email?.trim().toLowerCase();
+    const passwordTrim = password?.trim();
+
+    if (!validator.isEmail(emailNormalize)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Email",
+      });
+    }
+
+    const user = await User.findOne({
+      email: emailNormalize,
+      isDeleted: false,
+    }).select("+password");
+
+    if (!user || !user.isActive) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid email or password" });
+    }
+
+    const isPasswordMatch = await comparePassword(passwordTrim, user.password);
+
+    if (!isPasswordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const token = generateToken({
+      userId: user._id,
+      email: user.email,
+      roleId: user.roleId,
+      companyId: user.companyId,
+    });
+
+    const userData = {
+      _id: user._id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      email: user.email,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Login Successful",
+      token,
+      data: userData,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
 module.exports = {
   registerUser,
+  loginUser,
 };
