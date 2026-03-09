@@ -1,7 +1,8 @@
 const Role = require("../modal/role.model.js");
+const User = require("../modal/user.modal.js");
 const PERMISSIONS = require("../utils/permissions.js");
 const MODULES = require("../utils/modules.js");
-const { default: mongoose } = require("mongoose");
+const mongoose = require("mongoose");
 
 const createRole = async (req, res) => {
   try {
@@ -413,6 +414,19 @@ const softDeleteRole = async (req, res) => {
       });
     }
 
+    const usersWithRole = await User.exists({
+      roleId: roleId,
+      companyId,
+      isDeleted: false,
+    });
+
+    if (usersWithRole) {
+      return res.status(400).json({
+        success: false,
+        message: "Role cannot be deleted because users are assigned to it",
+      });
+    }
+
     role.isDeleted = true;
     role.isActive = false;
 
@@ -465,6 +479,20 @@ const deleteRole = async (req, res) => {
         message: "System roles cannot be modified",
       });
     }
+
+    const usersWithRole = await User.exists({
+      roleId: roleId,
+      companyId,
+      isDeleted: false,
+    });
+
+    if (usersWithRole) {
+      return res.status(400).json({
+        success: false,
+        message: "Role cannot be deleted because users are assigned to it",
+      });
+    }
+
     await Role.deleteOne({ _id: roleId });
     return res.status(200).json({
       success: true,
