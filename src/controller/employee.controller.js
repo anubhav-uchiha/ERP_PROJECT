@@ -126,7 +126,7 @@ const createEmployee = async (req, res) => {
 
 const getEmployeeById = async (req, res) => {
   try {
-    const employeeId = req.param.id;
+    const employeeId = req.params.id;
 
     const companyId = req.user.companyId;
 
@@ -148,7 +148,12 @@ const getEmployeeById = async (req, res) => {
         .json({ success: false, message: "Invalid compnay id" });
     }
 
-    const employee = await User.findOne({ employeeId });
+    const employee = await User.findOne({
+      _id: employeeId,
+      companyId: companyId,
+      isDeleted: false,
+      isActive: true,
+    }).select("-password");
 
     if (!employee) {
       return res
@@ -169,7 +174,157 @@ const getEmployeeById = async (req, res) => {
   }
 };
 
+const getAllEmployees = async (req, res) => {
+  try {
+    const companyId = req.user.companyId;
+    if (!companyId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized Access" });
+    }
+    const { page_no = 1, page_size = 10, search } = req.query;
+    const pageNo = Math.max(parseInt(page_no) || 1, 1);
+    const pageSize = Math.min(Math.max(parseInt(page_size) || 10, 1), 100);
+    const skip = (pageNo - 1) * pageSize;
+
+    const filter = {
+      companyId: companyId,
+      isDeleted: false,
+      isActive: true,
+    };
+
+    if (search && search.trim()) {
+      filter.name = { $regex: search.trim(), $options: "i" };
+    }
+
+    const [employee, totalEmployee] = await Promise.all([
+      User.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+      User.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Employees fetched successfully",
+      current_page: pageNo,
+      page_size: pageSize,
+      total_records: totalEmployee,
+      total_pages: Math.ceil(totalEmployee / pageSize),
+      data: employee,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
+const updateEmployee = async (req, res) => {
+  try {
+    const employeeId = req.params.id;
+    const companyId = req.user.companyId;
+    const { first_name, last_name, roleId } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid employee id" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid company id" });
+    }
+
+    if (!companyId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized Access" });
+    }
+
+    const employee = await User.findOne({
+      _id: employeeId,
+      companyId,
+      isDeleted: false,
+    });
+
+    if (!employee) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
+    }
+
+    if (first_name) employee.first_name = first_name.trim();
+    if (last_name) employee.last_name = last_name.trim();
+
+    if (typeof isActive === "boolean") {
+      employee.isActive = isActive;
+    }
+
+    if (roleId) {
+      if (!mongoose.Types.ObjectId.isValid(roleId)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid role id" });
+      }
+
+      const role = await Role.findOne({
+        _id: roleId,
+        companyId,
+        isDeleted: false,
+        isActive: true,
+      });
+
+      if (!role) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid role" });
+      }
+
+      employee.roleId = roleId;
+    }
+
+    await employee.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Employee updated successfully",
+      data: employee,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+const softDeleteEmployee = async (req, res) => {
+  try {
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+const deleteEmployee = async (req, res) => {
+  try {
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
 module.exports = {
   createEmployee,
   getEmployeeById,
+  getAllEmployees,
+  updateEmployee,
+  softDeleteEmployee,
+  deleteEmployee,
 };
