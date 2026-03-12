@@ -137,6 +137,7 @@ roleSchema.pre("validate", function (next) {
 });
 
 roleSchema.index({ name: 1, isActive: 1 });
+roleSchema.index({ companyId: 1, name: 1 });
 
 roleSchema.query.active = function () {
   return this.where({ isActive: true, isDeleted: false });

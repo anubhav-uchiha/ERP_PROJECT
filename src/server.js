@@ -7,6 +7,11 @@ const app = require("./app.js");
 //import the database connection function from the db.js file
 const connectDB = require("../config/db.js");
 
+const userRouter = require("./router/user.router.js");
+const companyRouter = require("./router/company.router.js");
+const roleRouter = require("./router/role.router.js");
+const employeeRouter = require("./router/employee.router.js");
+
 // get the PORT number from the environment variable
 const PORT = process.env.PORT || 9000;
 
@@ -18,6 +23,11 @@ const startServer = async () => {
      *  this prevents the server from running if the database fails
      */
     await connectDB();
+
+    app.use("/api/user", userRouter);
+    app.use("/api/company", companyRouter);
+    app.use("/api/role", roleRouter);
+    app.use("/api/employee", employeeRouter);
 
     // start the express server on the specified port
     app.listen(PORT, () => {
