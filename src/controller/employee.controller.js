@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const User = require("../modal/user.modal.js");
 const Role = require("../modal/role.model.js");
 const validator = require("validator");
-const { hashPassword, comparePassword } = require("../utils/password.utils");
+const { hashPassword } = require("../utils/password.utils");
 
 const createEmployee = async (req, res) => {
   try {
@@ -136,24 +136,19 @@ const getEmployeeById = async (req, res) => {
         .json({ success: false, message: "Invalid employee id" });
     }
 
-    if (!companyId) {
+    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
       return res
-        .status(400)
+        .status(401)
         .json({ success: false, message: "Unauthorized Access" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(companyId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid compnay id" });
     }
 
     const employee = await User.findOne({
       _id: employeeId,
-      companyId: companyId,
-      isDeleted: false,
-      isActive: true,
-    }).select("-password");
+      companyId,
+    })
+      .active()
+      .select("-password")
+      .lean();
 
     if (!employee) {
       return res
@@ -163,7 +158,7 @@ const getEmployeeById = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: " Emplyoee Fetched Successfully",
+      message: " Employee Fetched Successfully",
       data: employee,
     });
   } catch (error) {
@@ -177,28 +172,45 @@ const getEmployeeById = async (req, res) => {
 const getAllEmployees = async (req, res) => {
   try {
     const companyId = req.user.companyId;
-    if (!companyId) {
+
+    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
       return res
         .status(401)
         .json({ success: false, message: "Unauthorized Access" });
     }
     const { page_no = 1, page_size = 10, search } = req.query;
+
     const pageNo = Math.max(parseInt(page_no) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(page_size) || 10, 1), 100);
+
     const skip = (pageNo - 1) * pageSize;
 
     const filter = {
-      companyId: companyId,
-      isDeleted: false,
-      isActive: true,
+      companyId,
     };
 
     if (search && search.trim()) {
-      filter.name = { $regex: search.trim(), $options: "i" };
+      const searchValue = search.trim();
+
+      const roles = await Role.find({
+        name: { $regex: searchValue, $options: "i" },
+        companyId,
+        isDeleted: false,
+      }).select("_id");
+
+      const roleIds = roles.mao((role) => role._id);
+
+      filter.$or = [
+        { first_name: { $regex: searchValue, $options: "i" } },
+        { last_name: { $regex: searchValue, $options: "i" } },
+        { email: { $regex: searchValue, $options: "i" } },
+        { roleId: { $in: roleIds } },
+      ];
     }
 
     const [employee, totalEmployee] = await Promise.all([
       User.find(filter)
+        .active()
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(pageSize)
@@ -227,29 +239,30 @@ const updateEmployee = async (req, res) => {
   try {
     const employeeId = req.params.id;
     const companyId = req.user.companyId;
-    const { first_name, last_name, roleId } = req.body;
+    const { first_name, last_name, email, roleId } = req.body;
     if (!mongoose.Types.ObjectId.isValid(employeeId)) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid employee id" });
     }
-    if (!mongoose.Types.ObjectId.isValid(companyId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid company id" });
-    }
 
-    if (!companyId) {
+    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
       return res
         .status(401)
         .json({ success: false, message: "Unauthorized Access" });
     }
 
+    if (!first_name && !last_name && !email && !roleId) {
+      return res.status(400).json({
+        success: false,
+        message: "No fielsa provided for update",
+      });
+    }
+
     const employee = await User.findOne({
       _id: employeeId,
       companyId,
-      isDeleted: false,
-    });
+    }).active();
 
     if (!employee) {
       return res
@@ -257,11 +270,26 @@ const updateEmployee = async (req, res) => {
         .json({ success: false, message: "Employee not found" });
     }
 
-    if (first_name) employee.first_name = first_name.trim();
-    if (last_name) employee.last_name = last_name.trim();
-
-    if (typeof isActive === "boolean") {
-      employee.isActive = isActive;
+    if (first_name?.trim()) {
+      employee.first_name = first_name.trim();
+    }
+    if (last_name?.trim()) {
+      employee.last_name = last_name.trim();
+    }
+    if (email?.trim()) {
+      const emailNormalized = email.trim().toLowerCase();
+      const emailExist = await User.findOne({
+        email: emailNormalized,
+        companyId,
+        _id: { $ne: employeeId },
+        isDeleted: false,
+      });
+      if (emailExist) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Email already exists" });
+      }
+      employee.email = emailNormalized;
     }
 
     if (roleId) {
@@ -288,21 +316,68 @@ const updateEmployee = async (req, res) => {
     }
 
     await employee.save();
+    await employee.populate("roleId", "name");
+    const updatedEmployee = employee.toObject();
+    updateEmployee.role = updateEmployee.roleId;
+    delete updateEmployee.roleId;
+    delete updatedEmployee.password;
 
     return res.status(200).json({
       success: true,
       message: "Employee updated successfully",
-      data: employee,
+      data: updatedEmployee,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email already exists" });
+    }
     return res.status(500).json({
       success: false,
       message: error.message || "Internal Server Error",
     });
   }
 };
+
 const softDeleteEmployee = async (req, res) => {
   try {
+    const employeeId = req.params.id;
+    const companyId = req.user.companyId;
+
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid employee id" });
+    }
+
+    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized Access" });
+    }
+
+    const employee = await User.findOneAndUpdate(
+      {
+        _id: employeeId,
+        companyId,
+        isDeleted: false,
+      },
+      { isDeleted: true, deletedAt: new Date() },
+      { new: true },
+    );
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found or already deleted",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Employee soft deleted successfully",
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -310,8 +385,44 @@ const softDeleteEmployee = async (req, res) => {
     });
   }
 };
+
 const deleteEmployee = async (req, res) => {
   try {
+    const employeeId = req.params.id;
+    const companyId = req.user.companyId;
+
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid employee id" });
+    }
+
+    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized Access" });
+    }
+
+    const employee = await User.findOneAndDelete({
+      _id: employeeId,
+      companyId,
+      isDeleted: true,
+    });
+
+    if (!employee) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message:
+            "Employee not found or must be soft deleted before permanent deletion",
+        });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Employee permanently deleted",
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,

@@ -63,6 +63,10 @@ const userSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     /** Automatically adds two fields to the schema:
