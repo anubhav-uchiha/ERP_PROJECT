@@ -3,6 +3,7 @@ const User = require("../modal/user.modal.js");
 const Company = require("../modal/company.model.js");
 const { hashPassword, comparePassword } = require("../utils/password.utils.js");
 const generateToken = require("../utils/token.utils.js");
+const { default: mongoose } = require("mongoose");
 
 const registerUser = async (req, res) => {
   try {
@@ -149,6 +150,7 @@ const loginUser = async (req, res) => {
       email: user.email,
       roleId: user.roleId,
       companyId: user.companyId,
+      passwordChangedAt: user.passwordChangedAt,
     });
 
     const userData = {
@@ -174,7 +176,126 @@ const loginUser = async (req, res) => {
   }
 };
 
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const companyId = req.user.companyId;
+    const loggedInUserId = req.user._id;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid User Id" });
+    }
+    if (!companyId || !mongoose.Types.ObjectId.isValid(companyId)) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized Access" });
+    }
+    if (loggedInUserId.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only change your own password",
+      });
+    }
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      return res
+        .status(400)
+        .json({ success: false, message: "All Fields Are Required" });
+    }
+
+    const oldPasswordTrim = oldPassword.trim();
+    const newPasswordTrim = newPassword.trim();
+    const confirmPasswordTrim = confirmPassword.trim();
+
+    if (!oldPasswordTrim || !newPasswordTrim || !confirmPasswordTrim) {
+      return res
+        .status(400)
+        .json({ success: false, message: "All Fields Are Required" });
+    }
+
+    if (newPasswordTrim.length > 128) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwod cannot exceed 128 characters",
+      });
+    }
+
+    if (
+      !validator.isStrongPassword(newPasswordTrim, {
+        minLength: 8,
+        minLowercase: 1,
+        minNumbers: 1,
+        minUppercase: 1,
+        minSymbols: 1,
+      })
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 8 characters and include upper case character, lower case character, number and symbol",
+      });
+    }
+
+    if (newPasswordTrim !== confirmPasswordTrim) {
+      return res.status(400).json({
+        success: false,
+        message: "New Password did not match with confirm password",
+      });
+    }
+
+    const user = await User.findOne({
+      _id: userId,
+      companyId,
+    })
+      .active()
+      .select("+password");
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "No user found" });
+    }
+
+    const isMatch = await comparePassword(oldPasswordTrim, user.password);
+
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Old password is incorrect" });
+    }
+
+    const isSamePassword = await comparePassword(
+      newPasswordTrim,
+      user.password,
+    );
+
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be different from the current password",
+      });
+    }
+
+    const hashedPassword = await hashPassword(newPasswordTrim);
+
+    user.password = hashedPassword;
+    user.passwordChangedAt = new Date();
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Password changed successfully" });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
+  changePassword,
 };
