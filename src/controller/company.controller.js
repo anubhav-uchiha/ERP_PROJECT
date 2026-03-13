@@ -1,6 +1,8 @@
 // Import the Company mongoose model
 const Company = require("../modal/company.model.js");
 const Role = require("../modal/role.model.js");
+const User = require("../modal/user.modal.js");
+
 // Import validator library for validating email and other fields
 const validator = require("validator");
 const generatePermissions = require("../utils/generatePermissions");
@@ -21,6 +23,11 @@ const createCompany = async (req, res) => {
 
     // Check if the user already owns a company
     // If companyId exists on the user object, prevent creating another company
+    // if (req.user.companyId !== null && req.user.companyId !== undefined) {
+    //   return res
+    //     .status(400)
+    //     .json({ success: false, message: "User already owns a company" });
+    // }
     if (req.user.companyId) {
       return res
         .status(400)
@@ -135,9 +142,10 @@ const createCompany = async (req, res) => {
       isSystemRole: true,
     });
 
-    req.user.companyId = savedCompany._id;
-    req.user.roleId = ownerRole._id;
-    await req.user.save();
+    await User.findByIdAndUpdate(req.user._id, {
+      companyId: savedCompany._id,
+      roleId: ownerRole._id,
+    });
 
     // Send success response with the created company data
     return res.status(201).json({
@@ -146,6 +154,12 @@ const createCompany = async (req, res) => {
       company: savedCompany,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Company already exists with this email",
+      });
+    }
     // Catch any server errors and send a response
     return res.status(500).json({ success: false, message: error.message });
   }

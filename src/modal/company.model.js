@@ -140,6 +140,11 @@ companySchema.index(
   { unique: true, partialFilterExpression: { isDeleted: false } },
 );
 
+companySchema.index(
+  { slug: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } },
+);
+
 companySchema.query.active = function () {
   return this.where({ isDeleted: false, isActive: true });
 };
@@ -147,12 +152,14 @@ companySchema.query.active = function () {
 companySchema.pre("save", function (next) {
   // Check if the company_name field was modified and it has a value
   // if (this.isModified("company_name") && this.company_name) {
-  if (!this.isNew && this.company_name) {
+  if (this.company_name) {
     // Generate a URL-friendly slug from the company name
-    this.slug = this.company_name
+    const baseSlug = this.company_name
       .toLowerCase()
       .replace(/\s+/g, "-") // Replace one or more spaces with a hyphen (-)
       .replace(/[^\w\-]+/g, ""); // Remove any characters that are not letters, numbers, or hyphens
+
+    this.slug = `${baseSlug}-${Date.now()}`;
   }
   next();
 });
