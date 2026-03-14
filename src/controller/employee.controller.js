@@ -198,7 +198,7 @@ const getAllEmployees = async (req, res) => {
         isDeleted: false,
       }).select("_id");
 
-      const roleIds = roles.mao((role) => role._id);
+      const roleIds = roles.map((role) => role._id);
 
       filter.$or = [
         { first_name: { $regex: searchValue, $options: "i" } },
@@ -255,7 +255,7 @@ const updateEmployee = async (req, res) => {
     if (!first_name && !last_name && !email && !roleId) {
       return res.status(400).json({
         success: false,
-        message: "No fielsa provided for update",
+        message: "No fields provided for update",
       });
     }
 
@@ -318,8 +318,8 @@ const updateEmployee = async (req, res) => {
     await employee.save();
     await employee.populate("roleId", "name");
     const updatedEmployee = employee.toObject();
-    updateEmployee.role = updateEmployee.roleId;
-    delete updateEmployee.roleId;
+    updatedEmployee.role = updatedEmployee.roleId;
+    delete updatedEmployee.roleId;
     delete updatedEmployee.password;
 
     return res.status(200).json({
@@ -410,13 +410,11 @@ const deleteEmployee = async (req, res) => {
     });
 
     if (!employee) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message:
-            "Employee not found or must be soft deleted before permanent deletion",
-        });
+      return res.status(404).json({
+        success: false,
+        message:
+          "Employee not found or must be soft deleted before permanent deletion",
+      });
     }
 
     return res.status(200).json({
