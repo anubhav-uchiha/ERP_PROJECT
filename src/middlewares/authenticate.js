@@ -25,9 +25,7 @@ const authenticate = async (req, res, next) => {
 
     if (
       user.passwordChangedAt &&
-      decoded.passwordChangedAt &&
-      new Date(decoded.passwordChangedAt).getTime() !==
-        new Date(user.passwordChangedAt).getTime()
+      decoded.iat * 1000 < new Date(user.passwordChangedAt).getTime()
     ) {
       return res.status(401).json({
         success: false,
@@ -39,7 +37,7 @@ const authenticate = async (req, res, next) => {
       _id: user.companyId,
       isDeleted: false,
       isActive: true,
-    });
+    }).lean();
 
     if (!company) {
       return res.status(401).json({

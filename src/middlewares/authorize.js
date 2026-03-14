@@ -9,7 +9,7 @@ const authorize = (moduleName, action) => {
       }
       const role = req.user.roleId;
 
-      const allowed = role.permissions.some(
+      const allowed = role.permissions?.some(
         (perm) => perm.module === moduleName && perm.action === action,
       );
 
