@@ -11,7 +11,7 @@ const router = express.Router();
 
 router.post("/registerUser", registerUser);
 router.post("/loginUser", loginUser);
-router.post(
+router.patch(
   "/changePassword/:id",
   authenticate,
   authorize("USER", "UPDATE"),

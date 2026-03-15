@@ -116,7 +116,7 @@ const loginUser = async (req, res) => {
       slug: slugTrim,
       isDeleted: false,
       isActive: true,
-    });
+    }).lean();
 
     if (!company) {
       return res
@@ -150,7 +150,6 @@ const loginUser = async (req, res) => {
       email: user.email,
       roleId: user.roleId,
       companyId: user.companyId,
-      passwordChangedAt: user.passwordChangedAt,
     });
 
     const userData = {
@@ -158,6 +157,7 @@ const loginUser = async (req, res) => {
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
+      roleId: user.roleId,
       companyId: user.companyId,
       slug: company.slug,
     };
