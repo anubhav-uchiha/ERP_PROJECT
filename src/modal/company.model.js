@@ -1,67 +1,70 @@
 const mongoose = require("mongoose");
 
 // Create a schema for storing address information
-const addressSchema = mongoose.Schema({
-  // First line of the address (usually house number + street)
-  address_line_1: {
-    type: String,
-    required: true,
-    trim: true,
-  },
+const addressSchema = mongoose.Schema(
+  {
+    // First line of the address (usually house number + street)
+    address_line_1: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-  // Second line of the address (optional, like apartment or suite)
-  address_line_2: {
-    type: String,
-    trim: true,
-    default: "",
+    // Second line of the address (optional, like apartment or suite)
+    address_line_2: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    // Third line of address (optional)
+    address_line_3: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    // Fourth line of address (optional)
+    address_line_4: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    // City name where the address is located
+    city: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 50,
+    },
+    // State or province of the address
+    state: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 50,
+    },
+    // Country name where the address belongs
+    country: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 50,
+    },
+    // Postal / Zip code of the address
+    zipcode: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [/^\d{4,10}$/, "Invalid Zipcode"],
+      // Regex validation:
+      // ^\d{4,10}$ means only digits allowed and length must be between 4 and 10
+      // If validation fails, "Invalid Zipcode" error message will appear
+    },
   },
-  // Third line of address (optional)
-  address_line_3: {
-    type: String,
-    trim: true,
-    default: "",
-  },
-  // Fourth line of address (optional)
-  address_line_4: {
-    type: String,
-    trim: true,
-    default: "",
-  },
-  // City name where the address is located
-  city: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 2,
-    maxlength: 50,
-  },
-  // State or province of the address
-  state: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 2,
-    maxlength: 50,
-  },
-  // Country name where the address belongs
-  country: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 2,
-    maxlength: 50,
-  },
-  // Postal / Zip code of the address
-  zipcode: {
-    type: String,
-    required: true,
-    trim: true,
-    match: [/^\d{4,10}$/, "Invalid Zipcode"],
-    // Regex validation:
-    // ^\d{4,10}$ means only digits allowed and length must be between 4 and 10
-    // If validation fails, "Invalid Zipcode" error message will appear
-  },
-});
+  { _id: false },
+);
 
 // Create schema for storing company information
 const companySchema = mongoose.Schema(
