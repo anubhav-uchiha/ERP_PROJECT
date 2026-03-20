@@ -123,6 +123,7 @@ const createProduct = async (req, res) => {
     });
   }
 };
+
 const getAllProducts = async (req, res) => {
   try {
     const companyId = req.user.companyId;
@@ -234,8 +235,78 @@ const getAllProducts = async (req, res) => {
     });
   }
 };
+
 const getProductById = async (req, res) => {
   try {
+    const userId = req.user._id;
+    const companyId = req.user.companyId;
+    const productId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid User" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Conpany" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Product" });
+    }
+
+    const [product] = await Product.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(productId),
+          companyId: new mongoose.Types.ObjectId(companyId),
+          isDeleted: false,
+          isActive: true,
+        },
+      },
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplier",
+        },
+        $unwind: {
+          path: "$supplier",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          product_name: 1,
+          product_description: 1,
+          product_code: 1,
+          product_category: 1,
+          product_price: 1,
+          product_cost_price: 1,
+          stock_quantity: 1,
+          unit: 1,
+          supplier: {
+            _id: "$supplier._id",
+            supplier_name: "$supplier.supplier_name",
+            supplier_email: "$supplier.supplier_email",
+            supplier_phone: "$supplier.supplier_phone",
+          },
+        },
+      },
+      { $limit: 1 },
+    ]);
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Product details fetched:",
+      data: product,
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -246,24 +317,125 @@ const getProductById = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Internal Server Error",
+    const userId = req.user._id;
+    const companyId = req.user.companyId;
+    const productId = req.params.id;
+    const allowedUpdates = [
+      "product_name",
+      "product_code",
+      "product_category",
+      "product_price",
+      "product_cost_price",
+      "supplierId",
+      "stock_quantity",
+      "unit",
+      "product_description",
+    ];
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid User" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Conpany" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Product" });
+    }
+
+    const updates = {};
+
+    for (const key of Object.keys(req.body)) {
+      if (!allowedUpdates.includes(key)) continue;
+      let value = req.body[key];
+
+      if (typeof value === "string") {
+        value = value?.trim();
+      }
+
+      if (["product_name", "product_category", "unit"].includes(key)) {
+        value = value?.trim()?.toLowerCase();
+      }
+      if (key === "product_code") {
+        value = value?.trim()?.toUpperCase();
+      }
+
+      if (
+        ["product_price", "product_cost_price", "stock_quantity"].includes(key)
+      ) {
+        value = Number(value);
+        if (isNaN(value)) {
+          return res
+            .status(400)
+            .json({ success: false, message: `${key} must be a valid number` });
+        }
+        if (value < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `${key} cannot be negative`,
+          });
+        }
+      }
+      updates[key] = value;
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields provided for update",
+      });
+    }
+    if (updates.supplierId) {
+      if (!mongoose.Types.ObjectId.isValid(updates.supplierId)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Supplier" });
+      }
+      const supplier = await Supplier.findOne({
+        _id: updates.supplierId,
+        companyId,
+      })
+        .active()
+        .lean();
+
+      if (!supplier) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Supplier not found" });
+      }
+    }
+    if (updates.product_code) {
+      const existingProduct = await Product.findOne({
+        product_code: updates.product_code,
+        companyId,
+        _id: { $ne: productId },
+      })
+        .active()
+        .lean();
+      if (existingProduct) {
+        return res
+          .status(409)
+          .json({ success: false, message: "Product code already exists" });
+      }
+    }
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, companyId, isDeleted: false, isActive: true },
+      { $set: updates },
+      { new: true },
+    ).lean();
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No Product Found" });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Product updated Successfully",
+      data: product,
     });
-  }
-};
-const toggleProductStatus = async (req, res) => {
-  try {
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Internal Server Error",
-    });
-  }
-};
-const softDeleteProduct = async (req, res) => {
-  try {
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -272,4 +444,106 @@ const softDeleteProduct = async (req, res) => {
   }
 };
 
-module.exports = { createProduct, getAllProducts };
+const toggleProductStatus = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const companyId = req.user.companyId;
+    const productId = req.params.id;
+
+    const { isActive } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid User" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Conpany" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Product" });
+    }
+
+    if (typeof isActive !== "boolean") {
+      return res
+        .status(400)
+        .json({ success: false, message: "isActive must be a boolean value" });
+    }
+
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, companyId, isDeleted: false, isActive: true },
+      { $set: { isActive } },
+      { new: true, runValidators: true },
+    ).lean();
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No Product Found" });
+    }
+    return res.status(200).json({
+      success: true,
+      message: `Product ${product.isActive ? "activated" : "deactivated"} successfully`,
+      data: product,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
+const softDeleteProduct = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const companyId = req.user.companyId;
+    const productId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid User" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Conpany" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Product" });
+    }
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, companyId, isDeleted: false },
+      { $set: { isDeleted: true, isActive: false } },
+      { new: true },
+    ).lean();
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No Product Found" });
+    }
+    return res.status(200).json({
+      success: true,
+      message: `Product soft deleted successfully`,
+      data: product,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal Server Error",
+    });
+  }
+};
+
+module.exports = {
+  createProduct,
+  getAllProducts,
+  getProductById,
+  updateProduct,
+  toggleProductStatus,
+  softDeleteProduct,
+};
