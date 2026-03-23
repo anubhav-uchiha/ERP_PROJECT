@@ -4,10 +4,12 @@ const authorize = require("../middlewares/authorize");
 const {
   createSupplier,
   getSupplierById,
+  getAllSupplier,
   supplierUpdate,
   toggleSupplierStatus,
   softDeleteSupplier,
   deleteSupplierById,
+  deleteAllSupplier,
 } = require("../controller/supplier.controller");
 
 const router = express.Router();
@@ -28,7 +30,7 @@ router.get(
   "/getAllSupplier",
   authenticate,
   authorize("SUPPLIER", "READ"),
-  getSupplierById,
+  getAllSupplier,
 );
 router.put(
   "/supplierUpdate/:id",
@@ -58,7 +60,7 @@ router.delete(
   "/deleteAllSupplier",
   authenticate,
   authorize("SUPPLIER", "DELETE"),
-  deleteSupplierById,
+  deleteAllSupplier,
 );
 
 module.exports = router;

@@ -35,7 +35,6 @@ const createProduct = async (req, res) => {
       product_price === undefined ||
       product_cost_price === undefined ||
       !supplierId ||
-      stock_quantity === undefined ||
       !unit
     ) {
       return res
