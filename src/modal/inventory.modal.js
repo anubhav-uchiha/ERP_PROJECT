@@ -10,7 +10,7 @@ const inventorySchema = new mongoose.Schema(
     },
     companyId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "CompanyId",
+      ref: "Company",
       required: true,
       index: true,
     },
@@ -46,7 +46,7 @@ const inventorySchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    stockAfterTransation: {
+    stockAfterTransaction: {
       type: Number,
       required: true,
       min: 0,
