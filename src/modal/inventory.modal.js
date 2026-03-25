@@ -14,6 +14,10 @@ const inventorySchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    transactionCode: {
+      type: String,
+      required: true,
+    },
     type: {
       type: String,
       enum: ["IN", "OUT"],
@@ -25,9 +29,17 @@ const inventorySchema = new mongoose.Schema(
       required: true,
       min: 1,
     },
+    unitPrice: {
+      type: Number,
+      default: 0,
+    },
+    totalValue: {
+      type: Number,
+      default: 0,
+    },
     referenceType: {
       type: String,
-      enum: ["PURCHASE", "SALE", "MANUAL"],
+      enum: ["PURCHASE", "SALE", "MANUAL", "ADJUSTMENT"],
       required: true,
       uppercase: true,
     },
@@ -57,7 +69,7 @@ const inventorySchema = new mongoose.Schema(
     },
     isActive: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     deletedAt: {
       type: Date,
@@ -66,6 +78,14 @@ const inventorySchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+inventorySchema.index({ companyId: 1, productId: 1, createdAt: -1 });
+
+inventorySchema.index({ transactionCode: 1 }, { unique: true });
+
+inventorySchema.query.active = function () {
+  return this.where({ isDeleted: false, isActive: true });
+};
 
 const Inventory = mongoose.model("Inventory", inventorySchema);
 
