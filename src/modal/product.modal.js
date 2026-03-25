@@ -68,6 +68,16 @@ const productSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    minStockLevel: {
+      type: Number,
+      default: 10,
+    },
+    sku: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+    },
     isStock: {
       type: Boolean,
       default: true,
@@ -87,6 +97,8 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+productSchema.index({ companyId: 1, product_name: 1, product_code: 1 });
 
 productSchema.index(
   { companyId: 1, product_code: 1 },

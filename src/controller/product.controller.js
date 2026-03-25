@@ -190,10 +190,10 @@ const getAllProducts = async (req, res) => {
             { $limit: pageSize },
             {
               $project: {
-                project_name: 1,
-                project_code: 1,
-                project_category: 1,
-                project_price: 1,
+                product_name: 1,
+                product_code: 1,
+                product_category: 1,
+                product_price: 1,
                 stock_quantity: 1,
                 unit: 1,
                 createdAt: 1,
@@ -210,16 +210,16 @@ const getAllProducts = async (req, res) => {
       },
     ]);
 
-    const products = result[0].data;
-    const total_records = result[0].totalCount[0]?.count || 0;
+    const products = product[0]?.data || [];
+    const total_records = product[0]?.totalCount[0]?.count || 0;
 
-    if (!product) {
+    if (!product.length === 0) {
       return res
         .status(404)
         .json({ success: false, message: "Product Not Found" });
     }
     return res.status(200).json({
-      success: false,
+      success: true,
       message: "Product fetched successfully",
       page_no: pageNo,
       page_size: pageSize,
@@ -247,7 +247,7 @@ const getProductById = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(companyId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid Conpany" });
+        .json({ success: false, message: "Invalid Company" });
     }
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res
@@ -337,7 +337,7 @@ const updateProduct = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(companyId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid Conpany" });
+        .json({ success: false, message: "Invalid Company" });
     }
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res
@@ -457,7 +457,7 @@ const toggleProductStatus = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(companyId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid Conpany" });
+        .json({ success: false, message: "Invalid Company" });
     }
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res
@@ -472,7 +472,7 @@ const toggleProductStatus = async (req, res) => {
     }
 
     const product = await Product.findOneAndUpdate(
-      { _id: productId, companyId, isDeleted: false, isActive: true },
+      { _id: productId, companyId, isDeleted: false },
       { $set: { isActive } },
       { new: true, runValidators: true },
     ).lean();
@@ -507,7 +507,7 @@ const softDeleteProduct = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(companyId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid Conpany" });
+        .json({ success: false, message: "Invalid Company" });
     }
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res
@@ -516,7 +516,7 @@ const softDeleteProduct = async (req, res) => {
     }
     const product = await Product.findOneAndUpdate(
       { _id: productId, companyId, isDeleted: false },
-      { $set: { isDeleted: true, isActive: false } },
+      { $set: { isDeleted: true, isActive: false, deletedAt: new Date() } },
       { new: true },
     ).lean();
 
