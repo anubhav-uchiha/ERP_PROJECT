@@ -206,7 +206,7 @@ const getAllSupplier = async (req, res) => {
     }
 
     const sortOption = {
-      [sort]: order === "arc" ? 1 : -1,
+      [sort]: order === "asc" ? 1 : -1,
     };
 
     const supplier = await Supplier.find(filter)
@@ -393,8 +393,8 @@ const softDeleteSupplier = async (req, res) => {
         .json({ success: false, message: "Company Invalid" });
     }
     const supplier = await Supplier.findOneAndUpdate(
-      { _id: supplierId, companyId, isDeleted: true },
-      { $set: { isDeleted: true } },
+      { _id: supplierId, companyId, isDeleted: false },
+      { $set: { isDeleted: true, isActive: false, deletedAt: new Date() } },
       { new: true },
     ).lean();
 
@@ -471,12 +471,10 @@ const deleteAllSupplier = async (req, res) => {
         .json({ success: false, message: "No Supplier Found" });
     }
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: `${supplier.deletedCount} Supplier Deleted Successfully`,
-      });
+    return res.status(200).json({
+      success: true,
+      message: `${supplier.deletedCount} Supplier Deleted Successfully`,
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
