@@ -15,33 +15,45 @@ const addStock = async (req, res) => {
     quantity = Number(quantity);
     unitPrice = Number(unitPrice);
 
-    if (!mongoose.Types.ObjectId.isValid(userId))
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      await session.abortTransaction();
       return res.status(400).json({ success: false, message: "Invalid User" });
+    }
 
-    if (!mongoose.Types.ObjectId.isValid(companyId))
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Invalid Company" });
+    }
 
-    if (!mongoose.Types.ObjectId.isValid(productId))
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Invalid Product" });
+    }
 
-    if (quantity === undefined || quantity === null)
+    if (quantity === undefined || quantity === null) {
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Quantity is required" });
+    }
 
-    if (isNaN(quantity) || quantity <= 0)
+    if (isNaN(quantity) || quantity <= 0) {
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Quantity must be positive" });
+    }
 
-    if (isNaN(unitPrice) || unitPrice < 0)
+    if (isNaN(unitPrice) || unitPrice < 0) {
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Unit price cannot be negative" });
+    }
 
     const product = await Product.findOneAndUpdate(
       {
@@ -111,33 +123,31 @@ const removeStock = async (req, res) => {
     quantity = Number(quantity);
     unitPrice = Number(unitPrice);
 
-    if (!mongoose.Types.ObjectId.isValid(userId))
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      await session.abortTransaction();
       return res.status(400).json({ success: false, message: "Invalid User" });
+    }
 
-    if (!mongoose.Types.ObjectId.isValid(companyId))
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Invalid Company" });
+    }
 
-    if (!mongoose.Types.ObjectId.isValid(productId))
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Invalid Product" });
+    }
 
-    if (quantity === undefined || quantity === null)
+    if (isNaN(quantity) || quantity <= 0) {
+      await session.abortTransaction();
       return res
         .status(400)
-        .json({ success: false, message: "Quantity is required" });
-
-    if (isNaN(quantity) || quantity <= 0)
-      return res
-        .status(400)
-        .json({ success: false, message: "Quantity must be positive" });
-
-    if (isNaN(unitPrice) || unitPrice < 0)
-      return res
-        .status(400)
-        .json({ success: false, message: "Unit price cannot be negative" });
+        .json({ success: false, message: "Invalid quantity" });
+    }
 
     const product = await Product.findOneAndUpdate(
       {
@@ -210,55 +220,27 @@ const adjustStock = async (req, res) => {
     unitPrice = Number(unitPrice);
     type = type?.toUpperCase();
 
-    if (!mongoose.Types.ObjectId.isValid(userId))
-      return res.status(400).json({ success: false, message: "Invalid User" });
-
-    if (!mongoose.Types.ObjectId.isValid(companyId))
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid Company" });
-
-    if (!mongoose.Types.ObjectId.isValid(productId))
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ success: false, message: "Invalid Product" });
+    }
 
-    if (quantity === undefined || quantity === null)
-      return res
-        .status(400)
-        .json({ success: false, message: "Quantity is required" });
-
-    if (isNaN(quantity) || quantity <= 0)
-      return res
-        .status(400)
-        .json({ success: false, message: "Quantity must be positive" });
-
-    if (isNaN(unitPrice) || unitPrice < 0)
-      return res
-        .status(400)
-        .json({ success: false, message: "Unit price cannot be negative" });
-
-    if (!["IN", "OUT"].includes(type))
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid adjustment type" });
-
-    const query = {
-      _id: productId,
-      companyId,
-      isDeleted: false,
-      isActive: true,
-    };
-
-    if (type === "OUT") {
-      query.stock_quantity = { $gte: quantity };
+    if (!["IN", "OUT"].includes(type)) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: "Invalid type" });
     }
 
     const product = await Product.findOneAndUpdate(
-      query,
       {
-        $inc: { stock_quantity: type === "IN" ? quantity : -quantity },
+        _id: productId,
+        companyId,
+        ...(type === "OUT" && { stock_quantity: { $gte: quantity } }),
+        isDeleted: false,
+        isActive: true,
       },
+      { $inc: { stock_quantity: type === "IN" ? quantity : -quantity } },
       { new: true, session },
     );
 
@@ -331,9 +313,8 @@ const getInventoryHistory = async (req, res) => {
       order = "desc",
     } = req.query;
 
-    const pageNo = Math.max(parseInt(page_no) || 1, 1);
-    const pageSize = Math.min(Math.max(parseInt(page_size) || 10, 1), 100);
-    const skip = (pageNo - 1) * pageSize;
+    const allowedSort = ["createdAt", "quantity", "type"];
+    const sortField = allowedSort.includes(sort) ? sort : "createdAt";
 
     const matchStage = {
       companyId: new mongoose.Types.ObjectId(companyId),
@@ -360,35 +341,65 @@ const getInventoryHistory = async (req, res) => {
       matchStage.type = t;
     }
 
-    if (startDate || endDate) {
-      matchStage.createdAt = {};
-      if (startDate) matchStage.createdAt.$gte = new Date(startDate);
-      if (endDate) matchStage.createdAt.$lte = new Date(endDate);
+    if (startDate) {
+      const s = new Date(startDate);
+      if (isNaN(s))
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid startDate" });
+      matchStage.createdAt = { ...matchStage.createdAt, $gte: s };
+    }
+
+    if (endDate) {
+      const e = new Date(endDate);
+      if (isNaN(e))
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid endDate" });
+      matchStage.createdAt = { ...matchStage.createdAt, $lte: e };
     }
 
     const result = await Inventory.aggregate([
       { $match: matchStage },
       {
+        $lookup: {
+          from: "products",
+          localField: "productId",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+      { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "createdBy",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+      {
         $facet: {
           data: [
-            { $sort: { [sort]: order === "asc" ? 1 : -1 } },
-            { $skip: skip },
-            { $limit: pageSize },
+            { $sort: { [sortField]: order === "asc" ? 1 : -1 } },
+            { $skip: (page_no - 1) * page_size },
+            { $limit: Number(page_size) },
           ],
           totalCount: [{ $count: "count" }],
         },
       },
     ]);
 
-    const total_records = result[0]?.totalCount[0]?.count || 0;
+    const total = result[0]?.totalCount[0]?.count || 0;
 
     return res.status(200).json({
       success: true,
       message: "Inventory fetched successfully",
-      page_no: pageNo,
-      page_size: pageSize,
-      total_records,
-      total_pages: Math.ceil(total_records / pageSize),
+      page_no: Number(page_no),
+      page_size: Number(page_size),
+      total_records: total,
+      total_pages: Math.ceil(total / page_size),
       data: result[0]?.data || [],
     });
   } catch (error) {
