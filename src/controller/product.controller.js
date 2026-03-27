@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Product = require("../modal/product.modal");
 const Supplier = require("../modal/supplier.modal");
+const Tax = require("../modal/tax.modal");
 
 const createProduct = async (req, res) => {
   try {
@@ -23,6 +24,7 @@ const createProduct = async (req, res) => {
       product_price,
       product_cost_price,
       supplierId,
+      taxId,
       stock_quantity,
       unit,
       product_description,
@@ -35,6 +37,7 @@ const createProduct = async (req, res) => {
       product_price === undefined ||
       product_cost_price === undefined ||
       !supplierId ||
+      !taxId ||
       !unit
     ) {
       return res
@@ -70,6 +73,9 @@ const createProduct = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Invalid Supplier" });
     }
+    if (!mongoose.Types.ObjectId.isValid(taxId)) {
+      return res.status(400).json({ success: false, message: "Invalid Tax" });
+    }
 
     const supplier = await Supplier.findOne({ _id: supplierId, companyId })
       .active()
@@ -79,6 +85,14 @@ const createProduct = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Supplier not found" });
+    }
+
+    const tax = await Supplier.findOne({ _id: taxId, companyId })
+      .active()
+      .lean();
+
+    if (!tax) {
+      return res.status(404).json({ success: false, message: "Tax not found" });
     }
 
     const product = await Product.findOne({ product_code, companyId })
@@ -98,6 +112,7 @@ const createProduct = async (req, res) => {
       product_price,
       product_cost_price,
       supplierId,
+      taxId,
       stock_quantity,
       unit,
       product_description: product_description?.trim() || "",
@@ -183,6 +198,18 @@ const getAllProducts = async (req, res) => {
         },
       },
       {
+        $lookup: {
+          from: "taxes",
+          localField: "taxId",
+          foreignField: "_id",
+          as: "tax",
+        },
+        $unwind: {
+          path: "$tax",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
         $facet: {
           data: [
             { $sort: sortOption },
@@ -201,6 +228,12 @@ const getAllProducts = async (req, res) => {
                   _id: "$supplier._id",
                   supplier_name: "$supplier.supplier_name",
                   supplier_email: "$supplier.supplier_email",
+                },
+                tax: {
+                  _id: "$tax._id",
+                  tax_name: "$tax.tax_name",
+                  tax_rate: "$tax.tax_rate",
+                  tax_type: "$tax.tax_type",
                 },
               },
             },
@@ -277,6 +310,18 @@ const getProductById = async (req, res) => {
         },
       },
       {
+        $lookup: {
+          from: "taxes",
+          localField: "taxId",
+          foreignField: "_id",
+          as: "tax",
+        },
+        $unwind: {
+          path: "$tax",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
         $project: {
           product_name: 1,
           product_description: 1,
@@ -291,6 +336,12 @@ const getProductById = async (req, res) => {
             supplier_name: "$supplier.supplier_name",
             supplier_email: "$supplier.supplier_email",
             supplier_phone: "$supplier.supplier_phone",
+          },
+          tax: {
+            _id: "$tax._id",
+            tax_name: "$tax.tax_name",
+            tax_rate: "$tax.tax_rate",
+            tax_type: "$tax.tax_type",
           },
         },
       },
@@ -326,6 +377,7 @@ const updateProduct = async (req, res) => {
       "product_price",
       "product_cost_price",
       "supplierId",
+      "taxId",
       "stock_quantity",
       "unit",
       "product_description",
@@ -403,6 +455,23 @@ const updateProduct = async (req, res) => {
         return res
           .status(404)
           .json({ success: false, message: "Supplier not found" });
+      }
+    }
+    if (updates.taxId) {
+      if (!mongoose.Types.ObjectId.isValid(updates.taxId)) {
+        return res.status(400).json({ success: false, message: "Invalid Tax" });
+      }
+      const tax = await Tax.findOne({
+        _id: updates.taxId,
+        companyId,
+      })
+        .active()
+        .lean();
+
+      if (!tax) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Tax not found" });
       }
     }
     if (updates.product_code) {

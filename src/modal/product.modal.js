@@ -44,6 +44,12 @@ const productSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    taxId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tax",
+      required: true,
+      index: true,
+    },
     stock_quantity: {
       type: Number,
       required: false,
