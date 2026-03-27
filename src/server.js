@@ -11,6 +11,10 @@ const userRouter = require("./router/user.router.js");
 const companyRouter = require("./router/company.router.js");
 const roleRouter = require("./router/role.router.js");
 const employeeRouter = require("./router/employee.router.js");
+const supplierRouter = require("./router/supplier.router.js");
+const taxRouter = require("./router/tax.router.js");
+const productRouter = require("./router/product.router.js");
+const inventoryRouter = require("./router/inventory.router.js");
 
 // get the PORT number from the environment variable
 const PORT = process.env.PORT || 9000;
@@ -28,6 +32,10 @@ const startServer = async () => {
     app.use("/api/company", companyRouter);
     app.use("/api/role", roleRouter);
     app.use("/api/employee", employeeRouter);
+    app.use("/api/supplier", supplierRouter);
+    app.use("/api/tax", taxRouter);
+    app.use("/api/product", productRouter);
+    app.use("/api/inventory", inventoryRouter);
 
     // start the express server on the specified port
     app.listen(PORT, () => {
