@@ -39,6 +39,7 @@ const createTax = async (req, res) => {
       rate,
       companyId,
       isActive: true,
+      isDeleted: false,
     });
 
     if (existing) {
