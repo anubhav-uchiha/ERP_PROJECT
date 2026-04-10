@@ -41,5 +41,11 @@ const taxSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+taxSchema.index({ name: 1, companyId: 1 });
+
+taxSchema.query.active = function () {
+  return this.where({ isDeletewd: false, isActive: true });
+};
+
 const Tax = mongoose.model("Tax", taxSchema);
 module.exports = Tax;
